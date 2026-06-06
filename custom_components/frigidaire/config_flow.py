@@ -26,8 +26,9 @@ AUTH_FILE = "frigidaire.json"
 
 def load_auth(auth_path: str) -> tuple[str | None, str | None]:
     if not os.path.exists(auth_path):
-        with open(auth_path, "w"):
-            pass
+        # Create the file with owner-only permissions (0o600) since it stores
+        # a sensitive session key.
+        os.close(os.open(auth_path, os.O_CREAT | os.O_WRONLY, 0o600))
 
     if os.path.getsize(auth_path) > 0:
         with open(auth_path) as f:
@@ -37,8 +38,14 @@ def load_auth(auth_path: str) -> tuple[str | None, str | None]:
 
 
 def save_auth(auth_path: str, session_key: str, regional_base_url: str) -> None:
-    with open(auth_path, "w") as f:
+    # The session key is a sensitive bearer credential, so restrict the file to
+    # be readable/writable by the owner only (0o600).
+    fd = os.open(auth_path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
         json.dump({"session_key": session_key, "regional_base_url": regional_base_url}, f, ensure_ascii=False, indent=4)
+    # Ensure permissions are tightened even if the file already existed with
+    # broader permissions.
+    os.chmod(auth_path, 0o600)
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]):

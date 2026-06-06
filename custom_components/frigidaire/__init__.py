@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import traceback
 
 from homeassistant import data_entry_flow
 from homeassistant.config_entries import ConfigEntry
@@ -38,8 +37,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         except ConnectionError as err:
             raise ConfigEntryNotReady("Cannot connect to Frigidaire") from err
         except frigidaire.FrigidaireException as err:
-            # Handle frigidaire 429 gracefully
-            if "cas_3403" in traceback.format_exc():
+            # Handle frigidaire 429 gracefully. Match against the exception
+            # message directly rather than the full formatted traceback, which
+            # could incidentally contain the marker from unrelated frames.
+            if "cas_3403" in str(err):
                 raise data_entry_flow.AbortFlow(
                     "You have exceeded Frigidaire's maximum number of active sessions. "
                     "Please log out of another device or wait until an existing session expires."
